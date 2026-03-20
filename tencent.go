@@ -98,54 +98,49 @@ func newTencentClientClient(cfg TencentConfig) (Client, error) {
 	}, nil
 }
 
-func (t tencentClient) DescribeUserDetail() (string, error) {
+func (t tencentClient) DescribeUserDetail() (Accounts, error) {
 	data, err := t.doRequest("DescribeUserDetail", nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	acc := account{
+	acc := Account{
 		ID:       resp.Response.UserInfo.ID,
 		Name:     resp.Response.UserInfo.Uin,
 		UserType: resp.Response.UserInfo.UserGrade,
 	}
 
-	out, err := json.MarshalIndent([]account{acc}, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return Accounts{acc}, nil
 }
 
-func (t tencentClient) DescribeDomainNameList() (string, error) {
+func (t tencentClient) DescribeDomainNameList() (Domains, error) {
 	data, err := t.doRequest("DescribeDomainList", nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	var domains []domain
+	var items []Domain
 
 	for _, d := range resp.Response.DomainList {
-		domains = append(domains, domain{
+		items = append(items, Domain{
 			ID:          strconv.Itoa(d.DomainId),
 			Name:        d.Name,
 			Status:      d.Status,
@@ -156,12 +151,7 @@ func (t tencentClient) DescribeDomainNameList() (string, error) {
 		})
 	}
 
-	out, err := json.MarshalIndent(domains, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return Domains(items), nil
 }
 
 func (t tencentClient) DescribeRecordLineList(record *Record) error {
@@ -169,7 +159,7 @@ func (t tencentClient) DescribeRecordLineList(record *Record) error {
 	panic("implement me")
 }
 
-func (t tencentClient) DescribeRecordList(record *Record) (string, error) {
+func (t tencentClient) DescribeRecordList(record *Record) (DNSRecords, error) {
 	params, err := extract(record, struct {
 		Domain string `required:"true" json:"Domain"`
 	}{})
@@ -179,22 +169,22 @@ func (t tencentClient) DescribeRecordList(record *Record) (string, error) {
 
 	data, err := t.doRequest("DescribeRecordList", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	var records []dnsRecord
+	var records []DNSRecord
 
 	for _, d := range resp.Response.RecordList {
-		records = append(records, dnsRecord{
+		records = append(records, DNSRecord{
 			ID:      strconv.Itoa(d.RecordId),
 			Name:    d.Name,
 			Type:    d.Type,
@@ -204,15 +194,10 @@ func (t tencentClient) DescribeRecordList(record *Record) (string, error) {
 		})
 	}
 
-	out, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return DNSRecords(records), nil
 }
 
-func (t tencentClient) DescribeSubdomainRecordList(record *Record) (string, error) {
+func (t tencentClient) DescribeSubdomainRecordList(record *Record) (DNSRecords, error) {
 	params, err := extract(record, struct {
 		Domain    string `required:"true" json:"Domain"`
 		SubDomain string `required:"true" json:"Subdomain"`
@@ -223,22 +208,22 @@ func (t tencentClient) DescribeSubdomainRecordList(record *Record) (string, erro
 
 	data, err := t.doRequest("DescribeRecordList", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	var records []dnsRecord
+	var records []DNSRecord
 
 	for _, d := range resp.Response.RecordList {
-		records = append(records, dnsRecord{
+		records = append(records, DNSRecord{
 			ID:      strconv.Itoa(d.RecordId),
 			Name:    d.Name,
 			Type:    d.Type,
@@ -248,18 +233,13 @@ func (t tencentClient) DescribeSubdomainRecordList(record *Record) (string, erro
 		})
 	}
 
-	out, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return DNSRecords(records), nil
 }
 
-func (t tencentClient) DescribeRecord(record *Record) (string, error) {
+func (t tencentClient) DescribeRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
-		Domain string `required:"true" json:"Domain"`
-		Id     int    `required:"true" json:"RecordId"`
+		Domain   string `required:"true" json:"Domain"`
+		RecordId int    `required:"true" json:"RecordId"`
 	}{})
 	if err != nil {
 		panic(err)
@@ -267,19 +247,19 @@ func (t tencentClient) DescribeRecord(record *Record) (string, error) {
 
 	data, err := t.doRequest("DescribeRecord", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	recording := dnsRecord{
+	recording := DNSRecord{
 		ID:      strconv.Itoa(resp.Response.RecordInfo.Id),
 		Name:    resp.Response.RecordInfo.SubDomain + "." + params.Domain,
 		Type:    resp.Response.RecordInfo.RecordType,
@@ -288,15 +268,10 @@ func (t tencentClient) DescribeRecord(record *Record) (string, error) {
 		Line:    resp.Response.RecordInfo.RecordLine,
 	}
 
-	out, err := json.MarshalIndent(recording, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &recording, nil
 }
 
-func (t tencentClient) ModifyRecord(record *Record) (string, error) {
+func (t tencentClient) ModifyRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
 		Domain     string `required:"true" json:"Domain"`
 		SubDomain  string `optional:"@" json:"SubDomain"`
@@ -312,19 +287,19 @@ func (t tencentClient) ModifyRecord(record *Record) (string, error) {
 
 	data, err := t.doRequest("ModifyRecord", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	recording := dnsRecord{
+	recording := DNSRecord{
 		ID:      strconv.Itoa(resp.Response.RecordId),
 		Name:    params.SubDomain + "." + params.Domain,
 		Type:    params.RecordType,
@@ -333,16 +308,11 @@ func (t tencentClient) ModifyRecord(record *Record) (string, error) {
 		Line:    params.RecordLine,
 	}
 
-	out, err := json.MarshalIndent(recording, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &recording, nil
 
 }
 
-func (t tencentClient) CreateRecord(record *Record) (string, error) {
+func (t tencentClient) CreateRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
 		Domain     string `required:"true" json:"Domain"`
 		SubDomain  string `optional:"@" json:"SubDomain"`
@@ -357,19 +327,19 @@ func (t tencentClient) CreateRecord(record *Record) (string, error) {
 
 	data, err := t.doRequest("CreateRecord", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	recording := dnsRecord{
+	recording := DNSRecord{
 		ID:      strconv.Itoa(resp.Response.RecordId),
 		Name:    params.SubDomain + "." + params.Domain,
 		Type:    params.RecordType,
@@ -378,15 +348,10 @@ func (t tencentClient) CreateRecord(record *Record) (string, error) {
 		Line:    params.RecordLine,
 	}
 
-	out, err := json.MarshalIndent(recording, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &recording, nil
 }
 
-func (t tencentClient) DeleteRecord(record *Record) (string, error) {
+func (t tencentClient) DeleteRecord(record *Record) (*DeleteInfo, error) {
 	params, err := extract(record, struct {
 		Domain   string `required:"true" json:"Domain"`
 		RecordId int    `required:"true" json:"RecordId"`
@@ -395,30 +360,25 @@ func (t tencentClient) DeleteRecord(record *Record) (string, error) {
 		panic(err)
 	}
 
-	data, err := t.doRequest("DescribeRecord", params)
+	data, err := t.doRequest("DeleteRecord", params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var resp tencentResponse
 	if err := json.Unmarshal([]byte(data), &resp); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if resp.Response.Error != nil {
-		return "", fmt.Errorf("tencent api error: %+v", resp.Response.Error)
+		return nil, fmt.Errorf("tencent api error: %+v", resp.Response.Error)
 	}
 
-	deleterious := deleteInfo{
+	deleterious := DeleteInfo{
 		ID: resp.Response.RequestId,
 	}
 
-	out, err := json.MarshalIndent(deleterious, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &deleterious, nil
 }
 
 func (t tencentClient) doRequest(action string, params any) (string, error) {

@@ -1,18 +1,21 @@
 package dns_sdk
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
 )
 
-type account struct {
+type Account struct {
 	ID       any    `json:"id"`
 	Name     any    `json:"name"`
 	UserType string `json:"type"`
 }
 
-type domain struct {
+type Accounts []Account
+
+type Domain struct {
 	ID          string
 	Name        string
 	Status      string
@@ -22,7 +25,9 @@ type domain struct {
 	ModifiedOn  string
 }
 
-type dnsRecord struct {
+type Domains []Domain
+
+type DNSRecord struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
 	Name    string `json:"name"`
@@ -32,20 +37,50 @@ type dnsRecord struct {
 	Proxied bool   `json:"proxied"`
 }
 
-type deleteInfo struct {
+type DNSRecords []DNSRecord
+
+type DeleteInfo struct {
 	ID string `json:"id"`
 }
 
+func (a Account) String() string {
+	return jsonString(a)
+}
+
+func (a Accounts) String() string {
+	return jsonString(a)
+}
+
+func (d Domain) String() string {
+	return jsonString(d)
+}
+
+func (d Domains) String() string {
+	return jsonString(d)
+}
+
+func (r DNSRecord) String() string {
+	return jsonString(r)
+}
+
+func (r DNSRecords) String() string {
+	return jsonString(r)
+}
+
+func (d DeleteInfo) String() string {
+	return jsonString(d)
+}
+
 type Client interface {
-	DescribeUserDetail() (string, error)
-	DescribeDomainNameList() (string, error)
+	DescribeUserDetail() (Accounts, error)
+	DescribeDomainNameList() (Domains, error)
 	DescribeRecordLineList(*Record) error
-	DescribeRecordList(*Record) (string, error)
-	DescribeSubdomainRecordList(*Record) (string, error)
-	DescribeRecord(*Record) (string, error)
-	CreateRecord(*Record) (string, error)
-	ModifyRecord(*Record) (string, error)
-	DeleteRecord(*Record) (string, error)
+	DescribeRecordList(*Record) (DNSRecords, error)
+	DescribeSubdomainRecordList(*Record) (DNSRecords, error)
+	DescribeRecord(*Record) (*DNSRecord, error)
+	CreateRecord(*Record) (*DNSRecord, error)
+	ModifyRecord(*Record) (*DNSRecord, error)
+	DeleteRecord(*Record) (*DeleteInfo, error)
 }
 
 func NewClient(cfg any) (Client, error) {
@@ -188,4 +223,12 @@ func extract[B any, P any](b *B, _ P) (*P, error) {
 
 	out := pv.Interface().(P)
 	return &out, nil
+}
+
+func jsonString(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return `{"error":"json marshal failed"}`
+	}
+	return string(b)
 }

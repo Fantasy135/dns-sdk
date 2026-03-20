@@ -73,42 +73,43 @@ func newCloudflareClient(cfg CloudflareConfig) (Client, error) {
 	}, nil
 }
 
-func (c cloudflareClient) DescribeUserDetail() (string, error) {
-	data, _ := c.doRequest(http.MethodGet, c.basePath+"/accounts", nil)
-	var resp cloudFlareResponse[[]account]
-	err := json.Unmarshal([]byte(data), &resp)
+func (c cloudflareClient) DescribeUserDetail() (Accounts, error) {
+	data, err := c.doRequest(http.MethodGet, c.basePath+"/accounts", nil)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	var resp cloudFlareResponse[[]Account]
+	err = json.Unmarshal([]byte(data), &resp)
+	if err != nil {
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return resp.Result, nil
 }
 
-func (c cloudflareClient) DescribeDomainNameList() (string, error) {
-	data, _ := c.doRequest(http.MethodGet, c.basePath+"/zones", nil)
-	var resp cloudFlareResponse[[]zone]
-	err := json.Unmarshal([]byte(data), &resp)
+func (c cloudflareClient) DescribeDomainNameList() (Domains, error) {
+	data, err := c.doRequest(http.MethodGet, c.basePath+"/zones", nil)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	var resp cloudFlareResponse[[]zone]
+	err = json.Unmarshal([]byte(data), &resp)
+	if err != nil {
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	var domains []domain
+	var items []Domain
 
 	for _, z := range resp.Result {
-		domains = append(domains, domain{
+		items = append(items, Domain{
 			ID:          z.ID,
 			Name:        z.Name,
 			Status:      z.Status,
@@ -119,12 +120,7 @@ func (c cloudflareClient) DescribeDomainNameList() (string, error) {
 		})
 	}
 
-	out, err := json.MarshalIndent(domains, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return Domains(items), nil
 }
 
 func (c cloudflareClient) DescribeRecordLineList(record *Record) error {
@@ -132,7 +128,7 @@ func (c cloudflareClient) DescribeRecordLineList(record *Record) error {
 	panic("implement me")
 }
 
-func (c cloudflareClient) DescribeRecordList(record *Record) (string, error) {
+func (c cloudflareClient) DescribeRecordList(record *Record) (DNSRecords, error) {
 	params, err := extract(record, struct {
 		Domain string `required:"true" json:"Domain"`
 	}{})
@@ -141,29 +137,27 @@ func (c cloudflareClient) DescribeRecordList(record *Record) (string, error) {
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	data, _ := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records", c.basePath, zoneId), nil)
-	var resp cloudFlareResponse[[]dnsRecord]
+	data, err := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records", c.basePath, zoneId), nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[[]DNSRecord]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return DNSRecords(resp.Result), nil
 }
 
-func (c cloudflareClient) DescribeSubdomainRecordList(record *Record) (string, error) {
+func (c cloudflareClient) DescribeSubdomainRecordList(record *Record) (DNSRecords, error) {
 	params, err := extract(record, struct {
 		Domain    string `required:"true" json:"Domain"`
 		SubDomain string `required:"true" json:"Subdomain"`
@@ -173,33 +167,31 @@ func (c cloudflareClient) DescribeSubdomainRecordList(record *Record) (string, e
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	fullName := params.Domain
 	if params.SubDomain != "" && params.SubDomain != "@" {
 		fullName = params.SubDomain + "." + params.Domain
 	}
-	data, _ := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records?name=%s", c.basePath, zoneId, fullName), nil)
-	var resp cloudFlareResponse[[]dnsRecord]
+	data, err := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records?name=%s", c.basePath, zoneId, fullName), nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[[]DNSRecord]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return DNSRecords(resp.Result), nil
 }
 
-func (c cloudflareClient) DescribeRecord(record *Record) (string, error) {
+func (c cloudflareClient) DescribeRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
 		Domain   string `required:"true" json:"Domain"`
 		RecordId string `required:"true" json:"Id"`
@@ -209,29 +201,27 @@ func (c cloudflareClient) DescribeRecord(record *Record) (string, error) {
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	data, _ := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), nil)
-	var resp cloudFlareResponse[dnsRecord]
+	data, err := c.doRequest(http.MethodGet, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[DNSRecord]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &resp.Result, nil
 }
 
-func (c cloudflareClient) ModifyRecord(record *Record) (string, error) {
+func (c cloudflareClient) ModifyRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
 		Domain     string `required:"true" json:"Domain"`
 		SubDomain  string `required:"true" json:"SubDomain"`
@@ -246,7 +236,7 @@ func (c cloudflareClient) ModifyRecord(record *Record) (string, error) {
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	fullName := params.Domain
@@ -255,32 +245,30 @@ func (c cloudflareClient) ModifyRecord(record *Record) (string, error) {
 	}
 	payload := map[string]interface{}{
 		"name":    fullName,
-		"type":    record.RecordType,
-		"content": record.Value,
-		"ttl":     600,
-		"proxied": record.Proxied,
+		"type":    params.RecordType,
+		"content": params.Value,
+		"ttl":     params.TTL,
+		"proxied": params.Proxied,
 	}
-	data, _ := c.doRequest(http.MethodPut, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), payload)
-	var resp cloudFlareResponse[dnsRecord]
+	data, err := c.doRequest(http.MethodPut, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), payload)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[DNSRecord]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &resp.Result, nil
 
 }
 
-func (c cloudflareClient) CreateRecord(record *Record) (string, error) {
+func (c cloudflareClient) CreateRecord(record *Record) (*DNSRecord, error) {
 	params, err := extract(record, struct {
 		Domain     string `required:"true" json:"Domain"`
 		SubDomain  string `required:"true" json:"SubDomain"`
@@ -294,7 +282,7 @@ func (c cloudflareClient) CreateRecord(record *Record) (string, error) {
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	fullName := params.Domain
@@ -303,31 +291,29 @@ func (c cloudflareClient) CreateRecord(record *Record) (string, error) {
 	}
 	payload := map[string]interface{}{
 		"name":    fullName,
-		"type":    record.RecordType,
-		"content": record.Value,
-		"ttl":     600,
-		"proxied": record.Proxied,
+		"type":    params.RecordType,
+		"content": params.Value,
+		"ttl":     params.TTL,
+		"proxied": params.Proxied,
 	}
-	data, _ := c.doRequest(http.MethodPost, fmt.Sprintf("%s/zones/%s/dns_records", c.basePath, zoneId), payload)
-	var resp cloudFlareResponse[dnsRecord]
+	data, err := c.doRequest(http.MethodPost, fmt.Sprintf("%s/zones/%s/dns_records", c.basePath, zoneId), payload)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[DNSRecord]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &resp.Result, nil
 }
 
-func (c cloudflareClient) DeleteRecord(record *Record) (string, error) {
+func (c cloudflareClient) DeleteRecord(record *Record) (*DeleteInfo, error) {
 	params, err := extract(record, struct {
 		Domain   string `required:"true" json:"Domain"`
 		RecordId string `required:"true" json:"Id"`
@@ -337,26 +323,24 @@ func (c cloudflareClient) DeleteRecord(record *Record) (string, error) {
 	}
 	zoneId, err := c.getZoneId(params.Domain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	data, _ := c.doRequest(http.MethodDelete, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), nil)
-	var resp cloudFlareResponse[deleteInfo]
+	data, err := c.doRequest(http.MethodDelete, fmt.Sprintf("%s/zones/%s/dns_records/%s", c.basePath, zoneId, params.RecordId), nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp cloudFlareResponse[DeleteInfo]
 	err = json.Unmarshal([]byte(data), &resp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !resp.Success {
-		return "", fmt.Errorf("cloudflare api error: %+v", resp.Errors)
+		return nil, fmt.Errorf("cloudflare api error: %+v", resp.Errors)
 	}
 
-	out, err := json.MarshalIndent(resp.Result, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return &resp.Result, nil
 }
 
 func (c cloudflareClient) getZoneId(domain string) (string, error) {
